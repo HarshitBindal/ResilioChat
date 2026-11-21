@@ -74,6 +74,7 @@ def call_llm_with_failover(
     successful_response: Any = None
     successful_key_id: Optional[str] = None
     is_cache_hit = False
+    actual_model_used = settings.LLM_MODEL
 
     # 1. Check LiteLLM cache if not bypassing
     if not bypass_cache and litellm.cache is not None:
@@ -103,14 +104,32 @@ def call_llm_with_failover(
                 if cache_opts is not None:
                     extra_kwargs["cache"] = cache_opts
 
-                response = litellm.completion(
-                    model=settings.LLM_MODEL,
-                    messages=messages,
-                    api_key=raw_key,
-                    **extra_kwargs,
-                )
+                target_model = settings.LLM_MODEL
+                try:
+                    response = litellm.completion(
+                        model=target_model,
+                        messages=messages,
+                        api_key=raw_key,
+                        **extra_kwargs,
+                    )
+                except Exception as model_err:
+                    err_msg = str(model_err).lower()
+                    # If Google retired gemini-2.0-flash, automatically upgrade to gemini-3.8-flash
+                    if "no longer available" in err_msg or ("404" in err_msg and "gemini-2.0" in target_model):
+                        print(f"[LLM Gateway] Model {target_model} retired, falling back to gemini/gemini-3.8-flash", flush=True)
+                        target_model = "gemini/gemini-3.8-flash"
+                        response = litellm.completion(
+                            model=target_model,
+                            messages=messages,
+                            api_key=raw_key,
+                            **extra_kwargs,
+                        )
+                    else:
+                        raise model_err
+
                 successful_response = response
                 successful_key_id = key_id
+                actual_model_used = target_model
 
                 # Check if LiteLLM internal cache hit occurred
                 hidden_params = getattr(response, "_hidden_params", {}) or {}
@@ -184,7 +203,7 @@ def call_llm_with_failover(
 
     metadata: Dict[str, Any] = {
         "resolution_source": resolution_source,
-        "model": settings.LLM_MODEL,
+        "model": actual_model_used,
         "latency_ms": latency_ms,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
