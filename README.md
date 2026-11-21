@@ -6,9 +6,9 @@ ResilioChat is a resilient, production-ready LLM chatbot gateway powered by Goog
 
 ## 1. Live URLs
 
-- **Frontend App**: [https://resiliochat-frontend-placeholder.example.com](https://resiliochat-frontend-placeholder.example.com)
-- **Backend API**: [https://resiliochat-backend-placeholder.example.com](https://resiliochat-backend-placeholder.example.com)
-- **Health Check**: [https://resiliochat-backend-placeholder.example.com/health](https://resiliochat-backend-placeholder.example.com/health)
+- **Frontend App**: https://resilio-chat.vercel.app/
+- **Backend API**: https://resiliochat.onrender.com/
+- **Health Check**: https://resiliochat.onrender.com/health
 
 *(Replace the placeholder links above with your deployed domain URLs).*
 
