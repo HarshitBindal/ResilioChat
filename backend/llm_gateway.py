@@ -128,8 +128,9 @@ def call_llm_with_failover(
                         except Exception:
                             pass
                 break
-            except Exception:
-                # Real HTTP 429, quota errors, or 5xx errors from LiteLLM
+            except Exception as exc:
+                # Real HTTP 429, quota errors, authentication, or 5xx errors from LiteLLM
+                print(f"[LLM Gateway] Key {key_id} failed: {type(exc).__name__} - {exc}", flush=True)
                 fallback_attempts += 1
                 continue
 
