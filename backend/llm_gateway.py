@@ -104,35 +104,45 @@ def call_llm_with_failover(
                 if cache_opts is not None:
                     extra_kwargs["cache"] = cache_opts
 
-                target_model = settings.LLM_MODEL
-                try:
-                    response = litellm.completion(
-                        model=target_model,
-                        messages=messages,
-                        api_key=raw_key,
-                        **extra_kwargs,
-                    )
-                except Exception as model_err:
-                    err_msg = str(model_err).lower()
-                    # If Google retired gemini-2.0-flash, automatically upgrade to gemini-3.8-flash
-                    if "no longer available" in err_msg or ("404" in err_msg and "gemini-2.0" in target_model):
-                        print(f"[LLM Gateway] Model {target_model} retired, falling back to gemini/gemini-3.8-flash", flush=True)
-                        target_model = "gemini/gemini-3.8-flash"
-                        response = litellm.completion(
+                # Model candidate list with automated resilience for retired models or 503 high demand spikes
+                candidate_models = [settings.LLM_MODEL]
+                for fb in ("gemini/gemini-2.5-flash", "gemini/gemini-3.8-flash", "gemini/gemini-1.5-flash"):
+                    if fb not in candidate_models:
+                        candidate_models.append(fb)
+
+                call_response = None
+                model_used = None
+                last_call_err = None
+
+                for target_model in candidate_models:
+                    try:
+                        call_response = litellm.completion(
                             model=target_model,
                             messages=messages,
                             api_key=raw_key,
                             **extra_kwargs,
                         )
-                    else:
-                        raise model_err
+                        model_used = target_model
+                        break
+                    except Exception as model_err:
+                        last_call_err = model_err
+                        err_msg = str(model_err).lower()
+                        # If model is retired (404) or experiencing high demand (503), try next candidate
+                        if any(phrase in err_msg for phrase in ["no longer available", "high demand", "capacity", "unavailable", "503", "404"]):
+                            print(f"[LLM Gateway] Model {target_model} temporary issue ({type(model_err).__name__}), trying next candidate...", flush=True)
+                            continue
+                        else:
+                            raise model_err
 
-                successful_response = response
+                if call_response is None:
+                    raise last_call_err
+
+                successful_response = call_response
                 successful_key_id = key_id
-                actual_model_used = target_model
+                actual_model_used = model_used
 
                 # Check if LiteLLM internal cache hit occurred
-                hidden_params = getattr(response, "_hidden_params", {}) or {}
+                hidden_params = getattr(successful_response, "_hidden_params", {}) or {}
                 if hidden_params.get("cache_hit") is True:
                     is_cache_hit = True
                 else:
@@ -142,7 +152,7 @@ def call_llm_with_failover(
                             litellm.cache.add_cache(
                                 model=settings.LLM_MODEL,
                                 messages=messages,
-                                result=response,
+                                result=successful_response,
                             )
                         except Exception:
                             pass
