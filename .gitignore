@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+
+# Database
+data/
+*.db
+*.sqlite3
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
