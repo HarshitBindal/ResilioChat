@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-// API Base URL from environment variable with fallback
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// API Base URL from environment variable with fallback, automatically stripping any trailing slash
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = RAW_API_BASE_URL.replace(/\/+$/, '');
 
 // Generate a random short UUID session ID
 function generateSessionId() {
